@@ -59,13 +59,11 @@ import {BadgerGuestListAPI} from "../interfaces/yearn/BadgerGuestlistApi.sol";
 
     V1.5-BadgerRewards
     * Added integration with BadgerRewards via hooks
-    ***
-        onMint
-        onBurn
-        onTransfer
-        Emit to Tree
+        - _onMint
+        - _onBurn
+        - _onTransfer
+        - reportAdditionalToken
         all call the RewardsManager contract
-    ***
 */
 
 contract Vault is ERC20Upgradeable, SettAccessControl, PausableUpgradeable, ReentrancyGuardUpgradeable {
@@ -676,7 +674,7 @@ contract Vault is ERC20Upgradeable, SettAccessControl, PausableUpgradeable, Reen
     /// ===== Internal Implementations =====
 
     /// @dev Overridden _transfer implementation to also trigger the hook to call the badgerTree
-    function _transfer(address from, address to, uint256 amount) internal override nonReentrant {
+    function _transfer(address from, address to, uint256 amount) internal override {
         super._transfer(from, to, amount);
 
         _onTransfer(from, to, amount);
@@ -688,7 +686,7 @@ contract Vault is ERC20Upgradeable, SettAccessControl, PausableUpgradeable, Reen
     }
 
     /// @dev Overridden _mint implementation to also trigger the hook to call the badgerTree
-    function _mint(address recipient, uint256 shares) internal override nonReentrant {
+    function _mint(address recipient, uint256 shares) internal override {
         super._mint(recipient, shares);
         _onMint(recipient, shares);
     }
@@ -699,7 +697,7 @@ contract Vault is ERC20Upgradeable, SettAccessControl, PausableUpgradeable, Reen
     }
 
     /// @dev Overridden _burn implementation to also trigger the hook to call the badgerTree
-    function _burn(address from, uint256 shares) internal override nonReentrant {
+    function _burn(address from, uint256 shares) internal override {
         super._burn(from, shares);
         _onBurn(from, shares);
     }
