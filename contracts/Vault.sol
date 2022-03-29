@@ -12,6 +12,7 @@ import "@openzeppelin-contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol
 
 import "./lib/SettAccessControl.sol";
 
+import {IRewards} from "../interfaces/badger/IRewards.sol";
 import {IVault} from "../interfaces/badger/IVault.sol";
 import {IStrategy} from "../interfaces/badger/IStrategy.sol";
 import {IERC20Detailed} from "../interfaces/erc20/IERC20Detailed.sol";
@@ -57,12 +58,15 @@ import {BadgerGuestListAPI} from "../interfaces/yearn/BadgerGuestlistApi.sol";
     * All governance related fees goes to treasury
 
     V1.5-BadgerRewards
-    * Added integration with BadgerRewards via onDeposit, onTransfer and onWithdrawal hooks
+    * Added integration with BadgerRewards via hooks
     ***
-        _mintSharesFor retuns the amount of shares minted TODO
+        onMint
+        onBurn
+        onTransfer
         A similar function for withdraw (shares burned) TODO
         Ensure both Deposit and Withdraw are nonReentrnat TODO
         Add a programmable hook, afterDeposit afterWithdrawal afterTransfer TODO
+        Emit to Tree should use Tree Interface
     ***
 */
 
@@ -84,7 +88,7 @@ contract Vault is ERC20Upgradeable, SettAccessControl, PausableUpgradeable, Reen
     address public guardian; // guardian of vault and strategy
     address public treasury; // set by governance ... any fees go there
 
-    address public badgerTree; // Address we send tokens too via reportAdditionalTokens
+    IRewards public badgerTree; // Address we send tokens too via reportAdditionalTokens
 
     /// @dev name and symbol prefixes for lpcomponent token of vault
     string internal constant _defaultNamePrefix = "Badger Sett ";
@@ -221,7 +225,7 @@ contract Vault is ERC20Upgradeable, SettAccessControl, PausableUpgradeable, Reen
         strategist = _strategist;
         keeper = _keeper;
         guardian = _guardian;
-        badgerTree = _badgerTree;
+        badgerTree = IRewards(_badgerTree);
 
         lastHarvestedAt = block.timestamp; // setting initial value to the time when the vault was deployed
 
@@ -419,7 +423,9 @@ contract Vault is ERC20Upgradeable, SettAccessControl, PausableUpgradeable, Reen
 
         // Send rest to tree
         uint256 newBalance = IERC20Upgradeable(_token).balanceOf(address(this));
-        IERC20Upgradeable(_token).safeTransfer(badgerTree, newBalance);
+        IERC20Upgradeable(_token).safeApprove(address(badgerTree), newBalance);
+        badgerTree.addReward(badgerTree.currentEpoch(), address(this), _token, newBalance);
+
         emit TreeDistribution(_token, newBalance, block.number, block.timestamp);
     }
 
@@ -671,21 +677,41 @@ contract Vault is ERC20Upgradeable, SettAccessControl, PausableUpgradeable, Reen
 
     /// ===== Internal Implementations =====
 
-    /**
-     * @dev See {IERC20-transfer}.
-     *
-     * Requirements:
-     *
-     * - `recipient` cannot be the zero address.
-     * - the caller must have a balance of at least `amount`.
-     * Copy pasted from https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v3.4/contracts/token/ERC20/ERC20Upgradeable.sol
-     */
-    function transfer(address recipient, uint256 amount) public virtual override returns (bool) {
-        _transfer(_msgSender(), recipient, amount);
-        // TODO onTransfer
+    /// @dev Overridden _transfer implementation to also trigger the hook to call the badgerTree
+    function _transfer(address from, address to, uint256 amount) internal override nonReentrant {
+        super._transfer(from, to, amount);
 
-        return true;
+        _onTransfer(from, to, amount);
     }
+
+    /// @dev Hook to notify a transfer to the BadgerTree
+    function _onTransfer(address from, address to, uint256 amount) internal virtual {
+        badgerTree.notifyTransfer(from, to, amount);
+    }
+
+    /// @dev Overridden _mint implementation to also trigger the hook to call the badgerTree
+    function _mint(address recipient, uint256 shares) internal override nonReentrant {
+        super._mint(recipient, shares);
+        _onMint(recipient, shares);
+    }
+
+    /// @dev Hook to notify a Mint to the BadgerTree
+    function _onMint(address to, uint256 amount) internal virtual {
+        badgerTree.notifyTransfer(address(0), to, amount);
+    }
+
+    /// @dev Overridden _burn implementation to also trigger the hook to call the badgerTree
+    function _burn(address from, uint256 shares) internal override nonReentrant {
+        super._burn(from, shares);
+        _onBurn(from, shares);
+    }
+
+    /// @dev Hook to notify a Burn to the BadgerTree
+    function _onBurn(address from, uint256 amount) internal virtual {
+        badgerTree.notifyTransfer(from, address(0), amount);
+    }
+
+    /// ===== Tree Hooks =====
 
     /// @notice Deposits `_amount` tokens, issuing shares to `recipient`. 
     ///         Note that deposits are not accepted when `pausedDeposit` is true. 
@@ -702,9 +728,7 @@ contract Vault is ERC20Upgradeable, SettAccessControl, PausableUpgradeable, Reen
         uint256 _before = token.balanceOf(address(this));
         token.safeTransferFrom(msg.sender, address(this), _amount);
         uint256 _after = token.balanceOf(address(this));
-        uint256 minted = _mintSharesFor(_recipient, _after.sub(_before), _pool);
-
-        // TODO: onDeposit
+        _mintSharesFor(_recipient, _after.sub(_before), _pool);
     }
 
     /// @dev See `_depositWithAuthorization`
@@ -759,8 +783,6 @@ contract Vault is ERC20Upgradeable, SettAccessControl, PausableUpgradeable, Reen
         // After you burned the shares, and you have sent the funds, adding here is equivalent to depositing
         // Process withdrawal fee
         _mintSharesFor(treasury, _fee, balance().sub(_fee));
-
-        // TODO: onDeposit(shares, treasury)
     }
 
     /// @dev Helper function to calculate fees.

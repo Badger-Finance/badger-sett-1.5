@@ -9,13 +9,19 @@ autofetch_sources: True
 # require OpenZepplin Contracts
 dependencies:
     - OpenZeppelin/openzeppelin-contracts-upgradeable@3.4.0
+    - GalloDaSballo/badger-onchain-rewards@rfc.0.3
+
+    - OpenZeppelin/openzeppelin-contracts@4.5.0 ## For BadgerRewards
+
 
 # path remapping to support imports from GitHub/NPM
 compiler:
     solc:
-        version: 0.6.12
         remappings:
             - "@openzeppelin-contracts-upgradeable=OpenZeppelin/openzeppelin-contracts-upgradeable@3.4.0/contracts/"
+            - "@badger-rewards=GalloDaSballo/badger-onchain-rewards@rfc.0.3/contracts"
+
+            - "@oz=OpenZeppelin/openzeppelin-contracts@4.5.0/contracts/" ## For BadgerRewards
 
 reports:
     exclude_contracts:
