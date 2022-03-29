@@ -99,4 +99,4 @@ def test_version(deployer, governance, keeper, guardian, strategist, badgerTree,
         ],
   )
 
-  assert vault.version() == "1.5"
+  assert vault.version() == "1.5-BadgerRewards"
