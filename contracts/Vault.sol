@@ -63,10 +63,8 @@ import {BadgerGuestListAPI} from "../interfaces/yearn/BadgerGuestlistApi.sol";
         onMint
         onBurn
         onTransfer
-        A similar function for withdraw (shares burned) TODO
-        Ensure both Deposit and Withdraw are nonReentrnat TODO
-        Add a programmable hook, afterDeposit afterWithdrawal afterTransfer TODO
-        Emit to Tree should use Tree Interface
+        Emit to Tree
+        all call the RewardsManager contract
     ***
 */
 
@@ -777,8 +775,6 @@ contract Vault is ERC20Upgradeable, SettAccessControl, PausableUpgradeable, Reen
 
         // Send funds to user
         token.safeTransfer(msg.sender, r.sub(_fee));
-
-        // TODO: onWithdraw(shares)
 
         // After you burned the shares, and you have sent the funds, adding here is equivalent to depositing
         // Process withdrawal fee
