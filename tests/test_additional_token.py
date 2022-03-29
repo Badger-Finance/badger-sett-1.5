@@ -11,7 +11,7 @@ def test_report_an_extra_token(strategy, badgerTree, strategist, treasury, vault
   Proves that the strat using `_processExtraToken` will handle perf fee as well as send to tree
   """
   ## Badger Treasury
-  donator = accounts.at("0x4441776e6a5d61fa024a5117bfc26b953ad1f425", force=True)
+  donator = accounts.at("0xD0A7A8B98957b9CD3cFB9c0425AbE44551158e9e", force=True)
 
   ## Badger
   extra_token = interface.IERC20("0x3472A5A71965499acd81997a54BBA8D852C6E53d") 

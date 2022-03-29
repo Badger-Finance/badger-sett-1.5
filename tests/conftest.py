@@ -7,6 +7,7 @@ from brownie import (
     AdminUpgradeabilityProxy,
     TestVipCappedGuestListBbtcUpgradeable,
     accounts,
+    TestBadgerRewards
 )
 from helpers.constants import MaxUint256
 from helpers.constants import AddressZero
@@ -17,9 +18,19 @@ console = Console()
 from dotmap import DotMap
 import pytest
 
+@pytest.fixture
+def deployer():
+    return accounts[1]
 
 @pytest.fixture
-def deployed():
+def tree(deployer):
+  c = TestBadgerRewards.deploy({"from": deployer})
+  c.startNextEpoch()
+
+  return c
+
+@pytest.fixture
+def deployed(tree):
     """
     Deploys, vault and test strategy, mock token and wires them up.
     """
@@ -32,7 +43,7 @@ def deployed():
     governance = accounts[5]
     proxyAdmin = accounts[6]
 
-    badgerTree = accounts[7]
+    badgerTree = tree
     randomUser = accounts[8]
 
     token = MockToken.deploy({"from": deployer})
@@ -185,11 +196,6 @@ def tokens(deployed):
 
 
 ## Accounts ##
-@pytest.fixture
-def deployer(deployed):
-    return deployed.deployer
-
-
 @pytest.fixture
 def strategist(strategy):
     return accounts.at(strategy.strategist(), force=True)

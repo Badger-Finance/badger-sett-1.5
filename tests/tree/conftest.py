@@ -27,12 +27,7 @@ import pytest
   Then go into accrual etc...
 """
 
-@pytest.fixture
-def tree(deployer):
-  c = TestBadgerRewards.deploy({"from": deployer})
-  c.startNextEpoch()
 
-  return c
 
 @pytest.fixture
 def deploy_with_tree(tree):
