@@ -55,6 +55,15 @@ import {BadgerGuestListAPI} from "../interfaces/yearn/BadgerGuestlistApi.sol";
         - Governance will determine maxPerformanceFee, maxWithdrawalFee, maxManagementFee that can be set to prevent rug of funds.
     * Strategy would take the actors from the vault it is connected to
     * All governance related fees goes to treasury
+
+    V1.5-BadgerRewards
+    * Added integration with BadgerRewards via onDeposit, onTransfer and onWithdrawal hooks
+    ***
+        _mintSharesFor retuns the amount of shares minted TODO
+        A similar function for withdraw (shares burned) TODO
+        Ensure both Deposit and Withdraw are nonReentrnat TODO
+        Add a programmable hook, afterDeposit afterWithdrawal afterTransfer TODO
+    ***
 */
 
 contract Vault is ERC20Upgradeable, SettAccessControl, PausableUpgradeable, ReentrancyGuardUpgradeable {
@@ -244,7 +253,7 @@ contract Vault is ERC20Upgradeable, SettAccessControl, PausableUpgradeable, Reen
     /// @notice Used to track the deployed version of the contract.
     /// @return Current version of the contract.
     function version() external pure returns (string memory) {
-        return "1.5";
+        return "1.5-BadgerRewards";
     }
 
     /// @notice Gives the price for a single Sett share.
@@ -662,6 +671,22 @@ contract Vault is ERC20Upgradeable, SettAccessControl, PausableUpgradeable, Reen
 
     /// ===== Internal Implementations =====
 
+    /**
+     * @dev See {IERC20-transfer}.
+     *
+     * Requirements:
+     *
+     * - `recipient` cannot be the zero address.
+     * - the caller must have a balance of at least `amount`.
+     * Copy pasted from https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v3.4/contracts/token/ERC20/ERC20Upgradeable.sol
+     */
+    function transfer(address recipient, uint256 amount) public virtual override returns (bool) {
+        _transfer(_msgSender(), recipient, amount);
+        // TODO onTransfer
+
+        return true;
+    }
+
     /// @notice Deposits `_amount` tokens, issuing shares to `recipient`. 
     ///         Note that deposits are not accepted when `pausedDeposit` is true. 
     /// @dev This is the actual deposit operation.
@@ -677,7 +702,9 @@ contract Vault is ERC20Upgradeable, SettAccessControl, PausableUpgradeable, Reen
         uint256 _before = token.balanceOf(address(this));
         token.safeTransferFrom(msg.sender, address(this), _amount);
         uint256 _after = token.balanceOf(address(this));
-        _mintSharesFor(_recipient, _after.sub(_before), _pool);
+        uint256 minted = _mintSharesFor(_recipient, _after.sub(_before), _pool);
+
+        // TODO: onDeposit
     }
 
     /// @dev See `_depositWithAuthorization`
@@ -727,9 +754,13 @@ contract Vault is ERC20Upgradeable, SettAccessControl, PausableUpgradeable, Reen
         // Send funds to user
         token.safeTransfer(msg.sender, r.sub(_fee));
 
+        // TODO: onWithdraw(shares)
+
         // After you burned the shares, and you have sent the funds, adding here is equivalent to depositing
         // Process withdrawal fee
         _mintSharesFor(treasury, _fee, balance().sub(_fee));
+
+        // TODO: onDeposit(shares, treasury)
     }
 
     /// @dev Helper function to calculate fees.
@@ -767,8 +798,7 @@ contract Vault is ERC20Upgradeable, SettAccessControl, PausableUpgradeable, Reen
         address recipient,
         uint256 _amount,
         uint256 _pool
-    ) internal {
-        uint256 shares;
+    ) internal returns (uint256 shares) {
         if (totalSupply() == 0) {
             shares = _amount;
         } else {
