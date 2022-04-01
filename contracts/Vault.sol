@@ -776,7 +776,9 @@ contract Vault is ERC20Upgradeable, SettAccessControl, PausableUpgradeable, Reen
 
         // After you burned the shares, and you have sent the funds, adding here is equivalent to depositing
         // Process withdrawal fee
-        _mintSharesFor(treasury, _fee, balance().sub(_fee));
+        if(_fee != 0) {
+            _mintSharesFor(treasury, _fee, balance().sub(_fee));
+        }
     }
 
     /// @dev Helper function to calculate fees.
@@ -820,7 +822,10 @@ contract Vault is ERC20Upgradeable, SettAccessControl, PausableUpgradeable, Reen
         } else {
             shares = (_amount.mul(totalSupply())).div(_pool);
         }
-        _mint(recipient, shares);
+
+        if(shares > 0) {
+            _mint(recipient, shares);
+        }
     }
 
     /// @dev Helper function that issues shares based on performance and management fee when a harvest is reported.
